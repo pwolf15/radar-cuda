@@ -1,5 +1,4 @@
 import pytest
-from radar.params import RadarParams
 from radar.sim import beat_signal
 import numpy as np
 
