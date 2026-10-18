@@ -24,25 +24,27 @@ def test_single_target_angle_range_doppler_bins(p, R, v, theta_deg):
     assert d_bin - p.n_chirps // 2 == round(v / p.velocity_resolution)
 
 def test_adc_cube(p):
-    """Two targets 26 dB apart in noise are both recovered after range-Doopler
-    processing: proives noise is complex Gaussian and processing gain is real."""
+    """Sum of point-target beat signals plus complex white Gaussian noise.
+    
+    Two targets 26 dB apart in noise are both recovered after range-Doppler
+    processing: proves noise is complex Gaussian and processing gain is real."""
     targets = [
         (20, 5.0, np.deg2rad(20.0), 1.0),
         (35, -5.0, np.deg2rad(-20.0), 0.05)
     ]
     noise_stddev = 1.0
     sig = adc_cube(p, targets, noise_stddev=noise_stddev, seed=42)
-    # Hann on both FFT axes: rectangular-window sidelobes of the strong 
+    # Hann on both FFT axes: rectangular-window sidelobes of the strong
     # target (-13 dB) would bury the weak one (-26 dB).
     w_fast = np.hanning(p.n_samples)[None, None, :]
-    # One cell per target: a peak occupies a 3x3 blob, so top-k cells
-    # would return the strong target twice.
     w_slow = np.hanning(p.n_chirps)[None, :, None]
     rd = np.fft.fft(sig * w_fast * w_slow, axis=2)
     rd = np.fft.fftshift(np.fft.fft(rd, axis=1), axes=1)
     power = np.sum(np.abs(rd) ** 2, axis=0)
     expected = {(p.n_chirps // 2 + round(v / p.velocity_resolution),
                 round(R / p.range_resolution)) for R, v, _, _ in targets}
+    # One cell per target: a peak occupies a 3x3 blob, so top-k cells
+    # would return the strong target twice.
     peaks = (power == maximum_filter(power, size=3))
     cand = np.flatnonzero(peaks)
     top2 = cand[np.argsort(power.flat[cand])[-2:]]

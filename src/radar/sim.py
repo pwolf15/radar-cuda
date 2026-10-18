@@ -43,8 +43,8 @@ def beat_signal(params: RadarParams, R, v=0.0, theta=0.0):
 
 def adc_cube(params: RadarParams, targets: list[tuple[float, float, float, float]], noise_stddev=0.0, seed=0):
     """
-    targets: iterable of (R [ m], v[m/s], theta [rad], amplitude);
-    noise_stdev: std of complex Gaussian: sigma/srt(2) per component so E|hoise|^2 = noise_stddev^2
+    targets: iterable of (R [m], v [m/s], theta [rad], amplitude);
+    noise_stddev: std of complex Gaussian: sigma/sqrt(2) per component so E|hoise|^2 = noise_stddev^2
     SNR per sample ~= amplitude^2/noise_stddev^2
     10*log10(n_samples*n_chirps*n_channels) dB of processing gain
     """
