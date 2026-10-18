@@ -3,7 +3,7 @@ from scipy import constants
 import numpy as np
 
 def beat_signal(params: RadarParams, R, v=0.0, theta=0.0):
-    """Ideal beat signal of a single point target after dechipr mixing.
+    """Ideal beat signal of a single point target after dechirp mixing.
 
     Returns a complex (I/Q) array of shape (n_channels, n_chirps, n_samples):
     axis 0 = receive channel, axis 1 = slow time (chirp), axis 2 = fast time
@@ -40,3 +40,20 @@ def beat_signal(params: RadarParams, R, v=0.0, theta=0.0):
 
     phase = 2 * np.pi * (d_over_lambda * n[:, None, None] * np.sin(theta) + f_b * t[None, None, :] + f_d * m[None,:,None] * params.Tc)
     return np.exp(1j * phase)
+
+def adc_cube(params: RadarParams, targets: list[tuple[float, float, float, float]], noise_stddev=0.0, seed=0):
+    """
+    targets: iterable of (R [ m], v[m/s], theta [rad], amplitude);
+    noise_stdev: std of complex Gaussian: sigma/srt(2) per component so E|hoise|^2 = noise_stddev^2
+    SNR per sample ~= amplitude^2/noise_stddev^2
+    10*log10(n_samples*n_chirps*n_channels) dB of processing gain
+    """
+    signal = np.zeros((params.n_channels, params.n_chirps, params.n_samples), dtype=np.complex128)
+    for (R, v, theta, amplitude) in targets:
+        signal += amplitude * beat_signal(params, R, v, theta)
+    if noise_stddev > 0:
+        rng = np.random.default_rng(seed)
+        sigma = noise_stddev / np.sqrt(2)
+        noise = rng.normal(0, sigma, signal.shape) + 1j * rng.normal(0, sigma, signal.shape)
+        signal += noise
+    return signal
