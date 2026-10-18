@@ -42,11 +42,13 @@ def beat_signal(params: RadarParams, R, v=0.0, theta=0.0):
     return np.exp(1j * phase)
 
 def adc_cube(params: RadarParams, targets: list[tuple[float, float, float, float]], noise_stddev=0.0, seed=0):
-    """
+    """Sum of point-target beat signals plus complex white Gaussian noise.
+    
     targets: iterable of (R [m], v [m/s], theta [rad], amplitude);
-    noise_stddev: std of complex Gaussian: sigma/sqrt(2) per component so E|hoise|^2 = noise_stddev^2
-    SNR per sample ~= amplitude^2/noise_stddev^2
-    10*log10(n_samples*n_chirps*n_channels) dB of processing gain
+    noise_stddev: std of complex Gaussian: sigma/sqrt(2) per component so E|noise|^2 = noise_stddev^2
+    SNR per ADC sample is roughly amplitude^2/noise_stddev^2. The three FFTs add
+    10*log10(n_samples*n_chirps*n_channels) dB of processing gain, so targets well below the per-sample
+    noise floor are still detectable
     """
     signal = np.zeros((params.n_channels, params.n_chirps, params.n_samples), dtype=np.complex128)
     for (R, v, theta, amplitude) in targets:

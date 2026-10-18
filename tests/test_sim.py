@@ -24,9 +24,7 @@ def test_single_target_angle_range_doppler_bins(p, R, v, theta_deg):
     assert d_bin - p.n_chirps // 2 == round(v / p.velocity_resolution)
 
 def test_adc_cube(p):
-    """Sum of point-target beat signals plus complex white Gaussian noise.
-    
-    Two targets 26 dB apart in noise are both recovered after range-Doppler
+    """Two targets 26 dB apart in noise are both recovered after range-Doppler
     processing: proves noise is complex Gaussian and processing gain is real."""
     targets = [
         (20, 5.0, np.deg2rad(20.0), 1.0),
@@ -48,5 +46,5 @@ def test_adc_cube(p):
     peaks = (power == maximum_filter(power, size=3))
     cand = np.flatnonzero(peaks)
     top2 = cand[np.argsort(power.flat[cand])[-2:]]
-    found = {tuple(int(x) for x in np.unravel_index(i, power.shape)) for i in top2 }
+    found = {tuple(int(x) for x in np.unravel_index(i, power.shape)) for i in top2}
     assert found == expected
