@@ -29,8 +29,10 @@ class RadarParams:
 
     @property
     def velocity_resolution(self):
-        return 0
+        # bin spacing 
+        return self.wavelength / (2 * self.n_chirps * self.Tc)
 
     @property
     def max_velocity(self): 
-        return 0
+        # nyquist edge
+        return self.wavelength/(4 * self.Tc)
