@@ -16,6 +16,7 @@ Three simulated targets in complex Gaussian noise (amplitudes 1.0, 0.2, 0.05),
 | `src/radar/processing.py` | NumPy reference chain: `range_fft -> doppler_fft -> power_map -> ca_cfar_2d -> peaks -> angle_fft -> to_physical` |
 | `tests/` | every stage tested against physics (bin positions, Pfa on pure noise, sign conventions) |
 | `scripts/plot_rd.py` | produces the figure above |
+| `cuda/radar_cuda.cu` | cuFFT range-Doppler (Hann windows, fftshift) as a pybind11 module |
 
 ## Running (NumPy Reference)
 
@@ -37,8 +38,8 @@ uv run pytest tests/test_cuda.py
 
 ## Status
 
-- [x] Numpy reference chain
+- [x] NumPy reference chain
 - [x] cuFFT range-Doppler; matches NumPy to 2e-6 (float32)
-- [ ] CA-CFAR stencil kernel, checked against NumPY reference
+- [ ] CA-CFAR stencil kernel, checked against NumPy reference
 - [ ] per-stage timings
-- [ ] real frames (RaDICal / ColoRadar)
+- [ ] real frames (RaDICaL / ColoRadar)
