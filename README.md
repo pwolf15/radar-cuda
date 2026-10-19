@@ -1,6 +1,6 @@
 # radar-cuda
 
-FMCW radar signal-processing chain - synthetic ADC cube -> range/Doppler FFTs -> CA-CFAR detection -> angle estimation. Tested NumPy reference now; CUDA implementation to follow.
+FMCW radar signal-processing chain - synthetic ADC cube -> range/Doppler FFTs -> CA-CFAR detection -> angle estimation. Tested NumPy reference now.
 
 ![Range-Doppler Map with CA-CFAR detections](docs/range_doppler.png)
 
@@ -25,8 +25,13 @@ uv run pytest                    # run tests
 uv run python scripts/plot_rd.py # results of script shown above
 ```
 
+## Status
+
+- [ ] cuFFT range-Doppler; matches NumPy to 2e-6 (float32)
+- [ ] CA-CFAR kernel: in progress
+
 ## Next
 
-- cuFFT range/Doppler + CA-CFAR stencil kernel, evaluated against NumPy reference
+- CA-CFAR stencil kernel, evaluated against NumPy reference
 - per-stage timings, NumPy vs. CUDA
 - real frames (RaDICaL / ColoRadar)
