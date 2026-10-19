@@ -37,11 +37,8 @@ uv run pytest tests/test_cuda.py
 
 ## Status
 
+- [x] Numpy reference chain
 - [x] cuFFT range-Doppler; matches NumPy to 2e-6 (float32)
-- [ ] CA-CFAR kernel: in progress
-
-## Next
-
-- CA-CFAR stencil kernel, evaluated against NumPy reference
-- per-stage timings, NumPy vs. CUDA
-- real frames (RaDICaL / ColoRadar)
+- [ ] CA-CFAR stencil kernel, checked against NumPY reference
+- [ ] per-stage timings
+- [ ] real frames (RaDICal / ColoRadar)
