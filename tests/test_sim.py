@@ -37,7 +37,7 @@ def test_adc_cube(p, expected_cells):
     rd = np.fft.fft(sig * w_fast * w_slow, axis=2)
     rd = np.fft.fftshift(np.fft.fft(rd, axis=1), axes=1)
     power = np.sum(np.abs(rd) ** 2, axis=0)
-    expected = expected_cells(targets)
+    expected = expected_cells(targets).keys()
 
     # One cell per target: a peak occupies a 3x3 blob, so top-k cells
     # would return the strong target twice.

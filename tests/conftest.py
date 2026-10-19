@@ -14,8 +14,12 @@ def p():
 def expected_cells(p):
     def _f(targets):
         return {
-            (p.n_chirps // 2 + round(v / p.velocity_resolution), round(R / p.range_resolution))
-            for R, v, _, _ in targets
+            (p.n_chirps // 2 + round(v / p.velocity_resolution), round(R / p.range_resolution)): (
+                R,
+                v,
+                theta,
+            )
+            for R, v, theta, _ in targets
         }
 
     return _f

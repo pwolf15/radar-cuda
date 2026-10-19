@@ -1,6 +1,11 @@
 import numpy as np
 from scipy.ndimage import maximum_filter, uniform_filter
 
+""" range_fft -> doppler_fft -> power_map -> ca_cfar_2d -> peaks -> angle_fft -> to_physical
+
+axis convention: (C, M, N)
+"""
+
 
 def _window(n, kind):
     if kind is None:
@@ -13,15 +18,15 @@ def _window(n, kind):
 def range_fft(cube, window="hann"):
     """Windowed FFT along fast time (axis 2): (C, M, N) ADC cube -> range spectrum."""
     n_samples = cube.shape[2]
-    sig = cube * _window(n_samples, window)[None, None, :]
-    return np.fft.fft(sig, axis=2)
+    x_w = cube * _window(n_samples, window)[None, None, :]
+    return np.fft.fft(x_w, axis=2)
 
 
 def doppler_fft(x, window="hann"):
     """Windowed FFT along slow time (axis 1), fftshifted so index M//2 is zero Doppler."""
     n_chirps = x.shape[1]
-    rd = x * _window(n_chirps, window)[None, :, None]
-    return np.fft.fftshift(np.fft.fft(rd, axis=1), axes=1)
+    x_w = x * _window(n_chirps, window)[None, :, None]
+    return np.fft.fftshift(np.fft.fft(x_w, axis=1), axes=1)
 
 
 def power_map(rd):
@@ -89,8 +94,26 @@ def peaks(power, mask=None, size=3):
 
 
 def angle_fft(rd, cells, n_fft=64):
-    pass
+    """Angle of arrival for each (d_bin,r_bin) cell: zero-padded
+    FFT across channels, peak bin -> theta = arcsin(2k/n_fft).
+    Returns radians, shape (K,).
+
+    theta > 0 right of boresight, matching sim.beat_signal
+    resolution = 2/n_fft in sin(theta)
+    """
+    theta_hats = []
+    for d, r in cells:
+        ang = np.fft.fftshift(np.fft.fft(rd[:, d, r], n=n_fft))
+        a_bin = np.argmax(np.abs(ang)) - n_fft // 2
+        theta_hats.append(np.arcsin(2 * a_bin / n_fft))
+    return np.array(theta_hats)
 
 
-def to_physical(params, d_bin, r_bin):
-    pass
+def to_physical(params, cells):
+    """(d_bin, r_bin) -> (R [m], v [m/s]) using bin centers."""
+    Rvs = []
+    for d_bin, r_bin in cells:
+        R = r_bin * params.range_resolution
+        v = (d_bin - params.n_chirps // 2) * params.velocity_resolution
+        Rvs.append((R, v))
+    return Rvs
