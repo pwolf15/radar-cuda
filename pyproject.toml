@@ -1,7 +1,7 @@
 [project]
 name = "radar"
 version = "0.1.0"
-description = "Add your description here"
+description = "FMCW radar signal-processing chain - synthetic ADC cube -> range/Doppler FFTs -> CA-CFAR detection -> angle estimation"
 readme = "README.md"
 authors = [
     { name = "Patrick Wolf", email = "patrick.wolf@live.com" }
