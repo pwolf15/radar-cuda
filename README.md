@@ -27,7 +27,7 @@ uv run python scripts/plot_rd.py # results of script shown above
 
 ## Status
 
-- [ ] cuFFT range-Doppler; matches NumPy to 2e-6 (float32)
+- [x] cuFFT range-Doppler; matches NumPy to 2e-6 (float32)
 - [ ] CA-CFAR kernel: in progress
 
 ## Next
