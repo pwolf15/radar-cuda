@@ -1,4 +1,7 @@
+#include <cmath>
 #include <cuda_runtime.h>
+#include <numbers>
+#include <stdexcept>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <string>
@@ -34,12 +37,26 @@ __global__ void apply_window_slow(cuFloatComplex* x, const float* w, int M, int 
     if (i < total) { float s = w[(i / N) % M]; x[i].x *= s; x[i].y *= s;}
 }
 
+__global__ void fftshift(cuFloatComplex* out, const cuFloatComplex* in, int M, int N, size_t total) {
+    size_t i = blockIdx.x * (size_t)blockDim.x + threadIdx.x;
+    if (i < total) {
+        int n = i % N;
+        int m = (i / N) % M;
+        int c = i / (M * N);
+        int src_m = (m + M/2) % M;
+        out[i] = in[c * M * N + src_m * N + n];
+    }
+}
+
 struct RangeDopplerPlan {
     int C, M, N;
     cufftHandle plan_range, plan_doppler;
     float *d_w_fast, *d_w_slow;
     RangeDopplerPlan(int C, int M, int N): C(C), M(M), N(N) {
         // create window data and upload
+
+        // symmetric Hann, matches np.hanning
+        // periodic variant divides by N, not N-1
         std::vector<float> w_fast(N);
         for (int i = 0; i < N; ++i) {
             w_fast[i] = 0.5 * (1 - cos(2*std::numbers::pi*i/(N-1)));
@@ -89,6 +106,16 @@ struct RangeDopplerPlan {
         //  odist: 1
         //  type: C2C
         //  batch: N
+        rank = 1;
+        n = M;
+        inembed = M;
+        istride = N;
+        idist = 1;
+        onembed = M;
+        ostride = N;
+        odist = 1;
+        batch = N;
+        CUFFT_CHECK(cufftPlanMany(&plan_doppler, rank, &n, &inembed, istride, idist, &onembed, ostride, odist, CUFFT_C2C, batch));
     }
     ~RangeDopplerPlan() {
         cufftDestroy(plan_range);
@@ -96,16 +123,32 @@ struct RangeDopplerPlan {
         cudaFree(d_w_fast);
         cudaFree(d_w_slow);
     }
-    void run(const cuFloatComplex* d_in, cuFloatComplex* d_out) const {
+    void run(const cuFloatComplex* d_in, cuFloatComplex* d_out, cuFloatComplex* d_tmp) const {
+
+        size_t total = C*M*N;
+        CUDA_CHECK(cudaMemcpy(d_out, d_in, sizeof(cuFloatComplex)*total, cudaMemcpyDeviceToDevice));
+
+        // apply window-fast
+        apply_window_fast<<<(total + 255) / 256, 256>>>(d_out, d_w_fast, N, total);
+        CUDA_CHECK(cudaGetLastError());
 
         // run range FFT
-        size_t total = C*M*N;
-        cudaMemcpy(d_out, d_in, sizeof(cuFloatComplex)*total, cudaMemcpyDeviceToDevice);
-        apply_window_fast<<<(total + 255) / 256, 256>>>(d_out, d_w_fast, N, total);
-        cufftExecC2C(plan_range, d_out, d_out, CUFFT_FORWARD);
+        CUFFT_CHECK(cufftExecC2C(plan_range, d_out, d_out, CUFFT_FORWARD));
 
         // apply window-slow
+        apply_window_slow<<<(total + 255) / 256, 256>>>(d_out, d_w_slow, M, N, total);
+        CUDA_CHECK(cudaGetLastError());
+
         // run doppler fft
+        for (int c = 0; c < C; ++c) {
+            CUFFT_CHECK(cufftExecC2C(plan_doppler, d_out + c * M * N, d_out + c * M * N, CUFFT_FORWARD));
+        }
+        // shift elements
+        fftshift<<<(total + 255) / 256, 256>>>(d_tmp, d_out, M, N, total);
+        CUDA_CHECK(cudaGetLastError());
+
+        //@TODO: avoid copy
+        CUDA_CHECK(cudaMemcpy(d_out, d_tmp, sizeof(cuFloatComplex)*total, cudaMemcpyDeviceToDevice));
     }
 };
 
@@ -115,12 +158,12 @@ py::array_t<std::complex<float>> range_doppler(py::array_t<std::complex<float>, 
     auto buf = cube.request();
     int C = buf.shape[0], M = buf.shape[1], N = buf.shape[2];
     size_t n = size_t(C) * M * N;
-    DevBuf<cuFloatComplex> d_in(n), d_out(n);
+    DevBuf<cuFloatComplex> d_in(n), d_out(n), d_tmp(n);
     CUDA_CHECK(cudaMemcpy(d_in.p, buf.ptr, n * sizeof(cuFloatComplex), cudaMemcpyHostToDevice));
 
     // run range-doppler FFTs
     RangeDopplerPlan plan(C, M, N);
-    plan.run(d_in.p, d_out.p);
+    plan.run(d_in.p, d_out.p, d_tmp.p);
 
     // write data to NumPy buffers
     auto out = py::array_t<std::complex<float>>({C, M, N});
