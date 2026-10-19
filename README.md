@@ -1,6 +1,6 @@
 # radar-cuda
 
-FMCW radar signal-processing chain - synthetic ADC cube -> range/Doppler FFTs -> CA-CFAR detection -> angle estimation. Tested NumPy reference now.
+FMCW radar signal-processing chain - synthetic ADC cube -> range/Doppler FFTs -> CA-CFAR detection -> angle estimation. Tested NumPy reference, with CUDA port in progress.
 
 ![Range-Doppler Map with CA-CFAR detections](docs/range_doppler.png)
 
@@ -23,6 +23,16 @@ Three simulated targets in complex Gaussian noise (amplitudes 1.0, 0.2, 0.05),
 uv sync
 uv run pytest                    # run tests
 uv run python scripts/plot_rd.py # results of script shown above
+```
+
+## Running (CUDA)
+
+Needs NVIDIA GPU and CUDA >= 12; tests skip if module not built.
+
+``` bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -Dpybind11_DIR=$(uv run python -m pybind11 --cmakedir)
+cmake --build ./build
+uv run pytest tests/test_cuda.py
 ```
 
 ## Status
