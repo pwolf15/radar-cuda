@@ -7,13 +7,13 @@ class RadarParams:
     slope: float    # Hz/s
     Tc: float       # chirp duration
     fs: float       # ADC sample rate
-    n_samples: int  
+    n_samples: int
     n_chirps: int
     n_channels: int
 
     @property
-    def wavelength(self): 
-        return constants.c / self.fc 
+    def wavelength(self):
+        return constants.c / self.fc
 
     @property
     def bandwidth(self):            # slope * Tc
@@ -29,10 +29,10 @@ class RadarParams:
 
     @property
     def velocity_resolution(self):
-        # bin spacing 
+        # bin spacing
         return self.wavelength / (2 * self.n_chirps * self.Tc)
 
     @property
-    def max_velocity(self): 
+    def max_velocity(self):
         # nyquist edge
         return self.wavelength/(4 * self.Tc)

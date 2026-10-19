@@ -9,7 +9,7 @@ def beat_signal(params: RadarParams, R, v=0.0, theta=0.0):
     axis 0 = receive channel, axis 1 = slow time (chirp), axis 2 = fast time
     (ADC sample). The signal is a unit-amplitude complex exponential whose
     phase ramps linearly along each axis:
-    
+
         fast time : 2*pi * f_b * t,     f_b = 2*slope*R/c    -> range
         slow time : 2*pi * f_d * m*Tc,  f_d = 2*v/wavelength -> Doppler
         channel   : 2*pi * (d/wavelength) * n * sin(theta)   -> angle
@@ -19,7 +19,7 @@ def beat_signal(params: RadarParams, R, v=0.0, theta=0.0):
         theta > 0   right of boresight (positive spatial frequency), radians
         d = wavelength/2, uniform linear array
 
-    Not modeled: amplitude / range attenuation, noise, range migration 
+    Not modeled: amplitude / range attenuation, noise, range migration
     within a frame, intra-chirp Doppler, multiple targets.
     """
     # fast-time vector
@@ -43,7 +43,7 @@ def beat_signal(params: RadarParams, R, v=0.0, theta=0.0):
 
 def adc_cube(params: RadarParams, targets: list[tuple[float, float, float, float]], noise_stddev=0.0, seed=0):
     """Sum of point-target beat signals plus complex white Gaussian noise.
-    
+
     targets: iterable of (R [m], v [m/s], theta [rad], amplitude);
     noise_stddev: std of complex Gaussian: sigma/sqrt(2) per component so E|noise|^2 = noise_stddev^2
     SNR per ADC sample is roughly amplitude^2/noise_stddev^2. The three FFTs add
