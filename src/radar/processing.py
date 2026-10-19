@@ -1,10 +1,11 @@
-import numpy as np
-from scipy.ndimage import maximum_filter, uniform_filter
-
-""" range_fft -> doppler_fft -> power_map -> ca_cfar_2d -> peaks -> angle_fft -> to_physical
+"""NumPy reference implementation of the FMCW range-Doppler-angle chain
+range_fft -> doppler_fft -> power_map -> ca_cfar_2d -> peaks -> angle_fft -> to_physical
 
 axis convention: (C, M, N)
 """
+
+import numpy as np
+from scipy.ndimage import maximum_filter, uniform_filter
 
 
 def _window(n, kind):
@@ -84,7 +85,7 @@ def ca_cfar_2d(power, guard=(2, 2), train=(4, 8), pfa=1e-4):
 
 def peaks(power, mask=None, size=3):
     """(d_bin, r_bin) of local maxima of power, optionally restricted to mask,
-    sorted by descending power. Returns an (K, 2) in array."""
+    sorted by descending power. Returns an (K, 2) int array."""
     is_max = power == maximum_filter(power, size=size)
     if mask is not None:
         is_max &= mask
@@ -110,10 +111,11 @@ def angle_fft(rd, cells, n_fft=64):
 
 
 def to_physical(params, cells):
-    """(d_bin, r_bin) -> (R [m], v [m/s]) using bin centers."""
-    Rvs = []
-    for d_bin, r_bin in cells:
-        R = r_bin * params.range_resolution
-        v = (d_bin - params.n_chirps // 2) * params.velocity_resolution
-        Rvs.append((R, v))
-    return Rvs
+    """(d_bin, r_bin) -> (R [m], v [m/s]) using bin centers.
+
+    Returns (R,v) arrays of shape (K,)
+    """
+    cells = np.asarray(cells)
+    R = cells[:, 1] * params.range_resolution
+    v = (cells[:, 0] - params.n_chirps // 2) * params.velocity_resolution
+    return R, v

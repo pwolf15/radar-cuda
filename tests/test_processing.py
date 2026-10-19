@@ -18,7 +18,7 @@ def test_range_doppler_chain(p, expected_cells):
     noise_stddev = 1.0
     cube = adc_cube(p, targets, noise_stddev=noise_stddev, seed=42)
     power = power_map(doppler_fft(range_fft(cube)))
-    expected = expected_cells(targets).keys()
+    expected = set(expected_cells(targets))
     found = {tuple(c) for c in peaks(power)[:2]}
     assert found == expected
 
@@ -73,16 +73,17 @@ def test_angle_range_doppler_chain(p, expected_cells):
     power = power_map(rd)
     mask = ca_cfar_2d(power, pfa=1e-4)
     cells = peaks(power, mask)
-    theta_hats = angle_fft(rd, cells)
+    n_fft = 64
+    theta_hats = angle_fft(rd, cells, n_fft=n_fft)
     expected = expected_cells(targets)
-    for (d, r), th in zip(cells, theta_hats, strict=False):
-        assert abs(th - expected[(d, r)][2]) < np.arcsin(2 / 64)
+    assert {tuple(c) for c in cells} == set(expected)
+    for (d, r), th in zip(cells, theta_hats, strict=True):
+        assert abs(th - expected[(d, r)][2]) < np.arcsin(2 / n_fft)
 
 
 def test_to_physical(p):
     """Test known bins with known physics"""
-    Rvs = to_physical(p, [(77, 160)])
-    R, v = Rvs[0]
+    R, v = to_physical(p, [(77, 160)])
 
-    assert R == approx(20.0, 0.1)
-    assert v == approx(4.95, 0.1)
+    assert R[0] == approx(160 * p.range_resolution, abs=0.01)
+    assert v[0] == approx(13 * p.velocity_resolution, abs=0.01)
