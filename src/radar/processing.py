@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.ndimage import uniform_filter
+from scipy.ndimage import maximum_filter, uniform_filter
 
 
 def _window(n, kind):
@@ -75,3 +75,22 @@ def ca_cfar_2d(power, guard=(2, 2), train=(4, 8), pfa=1e-4):
     mask = padded > alpha * noise
 
     return mask[pd:-pd, pr:-pr]
+
+
+def peaks(power, mask=None, size=3):
+    """(d_bin, r_bin) of local maxima of power, optionally restricted to mask,
+    sorted by descending power. Returns an (K, 2) in array."""
+    is_max = power == maximum_filter(power, size=size)
+    if mask is not None:
+        is_max &= mask
+    cells = np.argwhere(is_max)
+    order = np.argsort(power[cells[:, 0], cells[:, 1]])[::-1]
+    return cells[order]
+
+
+def angle_fft(rd, cells, n_fft=64):
+    pass
+
+
+def to_physical(params, d_bin, r_bin):
+    pass

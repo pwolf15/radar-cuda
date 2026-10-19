@@ -1,7 +1,6 @@
 import numpy as np
-from scipy.ndimage import maximum_filter
 
-from radar.processing import ca_cfar_2d, doppler_fft, power_map, range_fft
+from radar.processing import ca_cfar_2d, doppler_fft, peaks, power_map, range_fft
 from radar.sim import adc_cube
 
 
@@ -11,10 +10,7 @@ def test_range_doppler_chain(p, expected_cells):
     cube = adc_cube(p, targets, noise_stddev=noise_stddev, seed=42)
     power = power_map(doppler_fft(range_fft(cube)))
     expected = expected_cells(targets)
-    peaks = power == maximum_filter(power, size=3)
-    cand = np.flatnonzero(peaks)
-    top2 = cand[np.argsort(power.flat[cand])[-2:]]
-    found = {tuple(int(x) for x in np.unravel_index(i, power.shape)) for i in top2}
+    found = {tuple(c) for c in peaks(power)[:2]}
     assert found == expected
 
 
@@ -49,6 +45,6 @@ def test_cfar_detects_targets(p, expected_cells):
     expected = expected_cells(targets)
     for cell in expected:
         assert mask[cell]
-    peaks = mask & (power == maximum_filter(power, size=5))
-    found = {tuple(int(x) for x in c) for c in np.argwhere(peaks)}
+
+    found = {tuple(c) for c in peaks(power, mask, 5)}
     assert found == expected

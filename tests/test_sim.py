@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-from scipy.ndimage import maximum_filter
 
+from radar.processing import peaks
 from radar.sim import adc_cube, beat_signal
 
 
@@ -41,8 +41,5 @@ def test_adc_cube(p, expected_cells):
 
     # One cell per target: a peak occupies a 3x3 blob, so top-k cells
     # would return the strong target twice.
-    peaks = power == maximum_filter(power, size=3)
-    cand = np.flatnonzero(peaks)
-    top2 = cand[np.argsort(power.flat[cand])[-2:]]
-    found = {tuple(int(x) for x in np.unravel_index(i, power.shape)) for i in top2}
+    found = {tuple(c) for c in peaks(power)[:2]}
     assert found == expected
