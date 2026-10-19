@@ -20,8 +20,10 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pre-commit>=4.7.0",
+    "pybind11>=3.1.0",
     "pytest>=9.1.1",
     "ruff>=0.17.1",
+    "scikit-build-core>=1.1.1",
 ]
 
 [tool.pytest.ini_options]

@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 
 [[package]]
@@ -465,6 +465,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pathspec"
+version = "1.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/82/42f767fc1c1143d6fd36efb827202a2d997a375e160a71eb2888a925aac1/pathspec-1.1.1.tar.gz", hash = "sha256:17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a", size = 135180, upload-time = "2026-04-27T01:46:08.907Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl", hash = "sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189", size = 57328, upload-time = "2026-04-27T01:46:07.06Z" },
+]
+
+[[package]]
 name = "pillow"
 version = "13.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -572,6 +581,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3a/c3/6965c2690ddce885ec75121572d065a5b94c5a5d8d3e657927ecda9fd715/pre_commit-4.7.0.tar.gz", hash = "sha256:1f3deee12b914c8fa184bd2b5953391c2e4f36763e403d4a23dc9983fa7c6e86", size = 198120, upload-time = "2026-10-12T20:45:40.32Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/eb/83/ce0a196e4f7b20b11ce3aa1fc72fb973f64b7628d51c1b8aebad37fb7f81/pre_commit-4.7.0-py2.py3-none-any.whl", hash = "sha256:2e229038ad3656081b70c27913157e4b636ef306f643f024a8a8e3f0f7b2f877", size = 226261, upload-time = "2026-10-12T20:45:38.858Z" },
+]
+
+[[package]]
+name = "pybind11"
+version = "3.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/76/f3/95b0f40b31df41dbfe6bb0857419c9442c15839cbac4796f1c26ae0b6081/pybind11-3.1.0.tar.gz", hash = "sha256:a1cc06b524ab3edca51f8ad3895f9c4fa20b8b19283173dff4ae781449dc9639", size = 603746, upload-time = "2026-08-06T23:33:00.675Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/33/fd/8762f7ee3e4e4be6d1d846cffb4916dd9bb02b2f800d3603718a0efe494c/pybind11-3.1.0-py3-none-any.whl", hash = "sha256:b8488090f8acffbcb6b5d6a85571a6827a0a2981ffb75e5a0b27b87c4a6b7dd0", size = 319402, upload-time = "2026-08-06T23:32:59.047Z" },
 ]
 
 [[package]]
@@ -691,8 +709,10 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "pre-commit" },
+    { name = "pybind11" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "scikit-build-core" },
 ]
 
 [package.metadata]
@@ -705,8 +725,10 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "pre-commit", specifier = ">=4.7.0" },
+    { name = "pybind11", specifier = ">=3.1.0" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff", specifier = ">=0.17.1" },
+    { name = "scikit-build-core", specifier = ">=1.1.1" },
 ]
 
 [[package]]
@@ -732,6 +754,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/0a/e8/1e186578076aff7a80735f625005fde678412ab609cd323ed182eb7d6b87/ruff-0.17.1-py3-none-win32.whl", hash = "sha256:1de0030a8aa78c65c5fecb84b2e5c390ac684c0452875a02afc7c083d49a496a", size = 9895093, upload-time = "2026-10-15T15:23:10.582Z" },
     { url = "https://files.pythonhosted.org/packages/6a/2e/da3d9589bae8e8b58f3a48bd5bc0b980232fb14a83bf02c3be7660f87c1b/ruff-0.17.1-py3-none-win_amd64.whl", hash = "sha256:5df76f16580fab58d0f6c98a3ac254a4abceb7b2489b8b678335869cff77b3d7", size = 10097955, upload-time = "2026-10-15T15:23:13.309Z" },
     { url = "https://files.pythonhosted.org/packages/df/c9/0f2a4dea06a5e12c1191ee3d96b1e1233797d0d5e18f97a2b909a95a9836/ruff-0.17.1-py3-none-win_arm64.whl", hash = "sha256:42400b9a6ff8515ff27796f07f92e0195be011c86e81e381606f58ea5502fef4", size = 9853542, upload-time = "2026-10-15T15:23:16.05Z" },
+]
+
+[[package]]
+name = "scikit-build-core"
+version = "1.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "pathspec" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b2/1a/8c00b19c0a1e7acf890676af2efa430339d38e59fa9437f2aab8517af3f4/scikit_build_core-1.1.1.tar.gz", hash = "sha256:e347a59193c878ac56a363e57506938652a6dd8c965790cb1cbc6bc7e8d5abad", size = 516192, upload-time = "2026-10-02T19:18:37.596Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/01/1b/83913d6d5c6a7f8ad5bf5d67b2d57ab09475f1bb9dd0c7a3f44067d59b90/scikit_build_core-1.1.1-py3-none-any.whl", hash = "sha256:6f6d6cf600e2e9639fd258ecd11cfc19bd189354b968916a519c6793e7e26237", size = 293450, upload-time = "2026-10-02T19:18:36.087Z" },
 ]
 
 [[package]]
