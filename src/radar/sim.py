@@ -1,6 +1,8 @@
-from radar.params import RadarParams
-from scipy import constants
 import numpy as np
+from scipy import constants
+
+from radar.params import RadarParams
+
 
 def beat_signal(params: RadarParams, R, v=0.0, theta=0.0):
     """Ideal beat signal of a single point target after dechirp mixing.
@@ -36,22 +38,34 @@ def beat_signal(params: RadarParams, R, v=0.0, theta=0.0):
 
     # angle vector
     n = np.arange(params.n_channels)
-    d_over_lambda = 0.5 # half-wavelength spacing
+    d_over_lambda = 0.5  # half-wavelength spacing
 
-    phase = 2 * np.pi * (d_over_lambda * n[:, None, None] * np.sin(theta) + f_b * t[None, None, :] + f_d * m[None,:,None] * params.Tc)
+    phase = (
+        2
+        * np.pi
+        * (
+            d_over_lambda * n[:, None, None] * np.sin(theta)
+            + f_b * t[None, None, :]
+            + f_d * m[None, :, None] * params.Tc
+        )
+    )
     return np.exp(1j * phase)
 
-def adc_cube(params: RadarParams, targets: list[tuple[float, float, float, float]], noise_stddev=0.0, seed=0):
+
+def adc_cube(
+    params: RadarParams, targets: list[tuple[float, float, float, float]], noise_stddev=0.0, seed=0
+):
     """Sum of point-target beat signals plus complex white Gaussian noise.
 
     targets: iterable of (R [m], v [m/s], theta [rad], amplitude);
-    noise_stddev: std of complex Gaussian: sigma/sqrt(2) per component so E|noise|^2 = noise_stddev^2
-    SNR per ADC sample is roughly amplitude^2/noise_stddev^2. The three FFTs add
-    10*log10(n_samples*n_chirps*n_channels) dB of processing gain, so targets well below the per-sample
-    noise floor are still detectable
+    noise_stddev: std of complex Gaussian: sigma/sqrt(2) per component so
+    E|noise|^2 = noise_stddev^2 SNR per ADC sample is roughly
+    amplitude^2/noise_stddev^2. The three FFTs add
+    10*log10(n_samples*n_chirps*n_channels) dB of processing gain,
+    so targets well below the per-sample noise floor are still detectable
     """
     signal = np.zeros((params.n_channels, params.n_chirps, params.n_samples), dtype=np.complex128)
-    for (R, v, theta, amplitude) in targets:
+    for R, v, theta, amplitude in targets:
         signal += amplitude * beat_signal(params, R, v, theta)
     if noise_stddev > 0:
         rng = np.random.default_rng(seed)

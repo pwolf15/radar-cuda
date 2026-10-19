@@ -1,10 +1,14 @@
 import numpy as np
 from scipy.ndimage import uniform_filter
 
+
 def _window(n, kind):
-    if kind is None: return np.ones(n)
-    if kind == "hann": return np.hanning(n)
+    if kind is None:
+        return np.ones(n)
+    if kind == "hann":
+        return np.hanning(n)
     raise ValueError(f"unknown window {kind!r}")
+
 
 def range_fft(cube, window="hann"):
     """Windowed FFT along fast time (axis 2): (C, M, N) ADC cube -> range spectrum."""
@@ -12,15 +16,18 @@ def range_fft(cube, window="hann"):
     sig = cube * _window(n_samples, window)[None, None, :]
     return np.fft.fft(sig, axis=2)
 
+
 def doppler_fft(x, window="hann"):
     """Windowed FFT along slow time (axis 1), fftshifted so index M//2 is zero Doppler."""
     n_chirps = x.shape[1]
     rd = x * _window(n_chirps, window)[None, :, None]
     return np.fft.fftshift(np.fft.fft(rd, axis=1), axes=1)
 
+
 def power_map(rd):
     """|.|^2 summed over channels (non-coherent integration): (C, M, N) -> (M, N)."""
-    return np.sum(np.abs(rd)**2, axis=0)
+    return np.sum(np.abs(rd) ** 2, axis=0)
+
 
 def ca_cfar_2d(power, guard=(2, 2), train=(4, 8), pfa=1e-4):
     """2-D cell-averaging CFAR on a (M,N) range-doppler power map.
@@ -51,20 +58,20 @@ def ca_cfar_2d(power, guard=(2, 2), train=(4, 8), pfa=1e-4):
 
     pd, pr = g_d + t_d, g_r + t_r
     # pad with 'wrap'; doppler is circular (slow-time FFT is periodic)
-    padded = np.pad(power, pad_width=((pd, pd), (0,0)), mode='wrap')
+    padded = np.pad(power, pad_width=((pd, pd), (0, 0)), mode="wrap")
     # assume noise beyond edge looks like noise at edge
-    padded = np.pad(padded, ((0,0), (pr, pr)), mode='edge')
+    padded = np.pad(padded, ((0, 0), (pr, pr)), mode="edge")
 
     # zero padding never reaches a kept cell: crop below
-    mean_outer = uniform_filter(padded, size=outer, mode='constant')
+    mean_outer = uniform_filter(padded, size=outer, mode="constant")
     sum_outer = mean_outer * n_outer
-    mean_inner = uniform_filter(padded, size=inner, mode='constant')
+    mean_inner = uniform_filter(padded, size=inner, mode="constant")
     sum_inner = mean_inner * n_inner
 
     sum_train = sum_outer - sum_inner
     noise = sum_train / n_train
 
-    alpha = n_train * (pfa ** (-1/n_train) - 1)
+    alpha = n_train * (pfa ** (-1 / n_train) - 1)
     mask = padded > alpha * noise
 
     return mask[pd:-pd, pr:-pr]
