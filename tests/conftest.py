@@ -1,11 +1,14 @@
 import pathlib
 import sys
 
+import numpy as np
+
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "build"))
 
 import pytest
 
 from radar.params import RadarParams
+from radar.sim import adc_cube
 
 
 @pytest.fixture
@@ -28,3 +31,9 @@ def expected_cells(p):
         }
 
     return _f
+
+
+@pytest.fixture
+def cube(p):
+    targets = [(20, 5.0, np.deg2rad(20.0), 1.0), (35, -5.0, np.deg2rad(-20.0), 0.05)]
+    return adc_cube(p, targets, noise_stddev=1.0, seed=42)
