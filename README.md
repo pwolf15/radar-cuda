@@ -52,6 +52,6 @@ Per-stage "wall" rows allocate and transfer per call; the pipeline row uploads o
 
 - [x] NumPy reference chain
 - [x] cuFFT range-Doppler; matches NumPy to 2e-6 (float32)
-- [ ] CA-CFAR stencil kernel, checked against NumPy reference
+- [x] CA-CFAR stencil kernel, checked against NumPy reference
 - [x] per-stage timings
 - [ ] real frames (RaDICaL / ColoRadar)
