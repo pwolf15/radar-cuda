@@ -29,6 +29,7 @@ rd_np = doppler_fft(range_fft(cube))
 pw_np = power_map(rd_np)
 rd_cu = radar_cuda.range_doppler(cube)
 pw_cu = radar_cuda.power_map(rd_cu)
+pipe = radar_cuda.RadarPipeline(*cube.shape)
 
 
 def np_chain(c):
@@ -48,7 +49,10 @@ rows = [
     ("power_map", bench(power_map, rd_np), bench(radar_cuda.power_map, rd_cu)),
     ("ca_cfar_2d", bench(ca_cfar_2d, pw_np), bench(radar_cuda.ca_cfar_2d, pw_cu)),
     ("full chain", bench(np_chain, cube), bench(cu_chain, cube)),
+    ("pipeline (1 H2D, 1 D2H)", bench(np_chain, cube), bench(pipe.process, cube)),
 ]
-print(f"{'stage':<20}{'NumPy ms':>10}{'CUDA ms':>10}{'speedup':>9}")
+print(f"{'stage':<26}{'NumPy ms':>10}{'CUDA ms':>10}{'speedup':>9}")
 for name, a, b in rows:
-    print(f"{name:<20}{a:10.2f}{b:10.2f}{a / b:>9.1f}x")
+    print(f"{name:<26}{a:10.2f}{b:10.2f}{a / b:>9.1f}x")
+t = pipe.process(cube)["t_ms"]
+print("\nkernel breakdown (ms):", {k: round(v, 3) for k, v in t.items()})

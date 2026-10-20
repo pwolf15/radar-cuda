@@ -36,10 +36,22 @@ cmake --build ./build
 uv run pytest tests/test_cuda.py
 ```
 
+## Timings (RTX 3060, 8x128x400 frame, float32 CUDA vs float64 NumPy)
+
+| stage              | NumPy ms | CUDA ms (wall, per call) | CUDA ms (kernel only) |
+|--------------------|---------:|-------------------------:|----------------------:|
+| range + Doppler FFT|    13.3  |   2.15                   | 0.18                  |
+| power map          |     2.1  |   0.69                   | 0.012                 |
+| CA-CFAR (naive)    |     1.9  |   0.14                   | 0.065                 |
+| full chain         |    18.3  |   0.80 (pipeline)        | 0.26                  |
+
+Wall-clock includes host-to-device (0.48 ms for the 3.3 MB cube) and device-to-host (0.07 ms).
+Per-stage "wall" rows allocate and transfer per call; the pipeline row uploads once, runs three kernels, downloads `power` and `mask`. Kernel times are `cudaEvent` deltas. `scripts/bench.py` reproduces the table.
+
 ## Status
 
 - [x] NumPy reference chain
 - [x] cuFFT range-Doppler; matches NumPy to 2e-6 (float32)
 - [ ] CA-CFAR stencil kernel, checked against NumPy reference
-- [ ] per-stage timings
+- [x] per-stage timings
 - [ ] real frames (RaDICaL / ColoRadar)

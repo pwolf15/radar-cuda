@@ -239,6 +239,107 @@ struct RangeDopplerPlan {
   }
 };
 
+struct RadarPipeline {
+  int C, M, N;
+  int g_d, g_r, t_d, t_r;
+  int n_train;
+  float alpha;
+  RangeDopplerPlan fft;
+  DevBuf<cuFloatComplex> d_cube, d_rd, d_tmp;
+  DevBuf<float> d_power;
+  DevBuf<uint8_t> d_mask;
+  cudaEvent_t ev[6]; // timing
+
+  RadarPipeline(int C, int M, int N, std::pair<int, int> guard,
+                std::pair<int, int> train, float pfa)
+      : C(C), M(M), N(N), fft(C, M, N), d_cube(C * M * N), d_rd(C * M * N),
+        d_tmp(C * M * N), d_power(N * M), d_mask(M * N), g_d(guard.first),
+        g_r(guard.second), t_d(train.first), t_r(train.second) {
+    // n_train, alpha
+    auto [g_d, g_r] = guard;
+    auto [t_d, t_r] = train;
+    int n_inner = (2 * g_d + 1) * (2 * g_r + 1);
+    int n_outer = (2 * (g_d + t_d) + 1) * (2 * (g_r + t_r) + 1);
+    n_train = n_outer - n_inner;
+    alpha = compute_alpha(n_train, pfa);
+
+    for (size_t i = 0; i < 6; ++i) {
+      cudaEventCreate(&ev[i]);
+    }
+  }
+
+  ~RadarPipeline() {
+    for (size_t i = 0; i < 6; ++i) {
+      cudaEventDestroy(ev[i]);
+    }
+  }
+
+  py::dict process(py::array_t<std::complex<float>,
+                               py::array::c_style | py::array::forcecast>
+                       cube) {
+    float ms_h2d, ms_fft, ms_power, ms_cfar, ms_d2h;
+
+    CUDA_CHECK(cudaEventRecord(ev[0]));
+
+    auto buf = cube.request();
+    size_t n = size_t(C) * M * N;
+    CUDA_CHECK(cudaMemcpy(d_cube.p, buf.ptr, n * sizeof(cuFloatComplex),
+                          cudaMemcpyHostToDevice));
+
+    CUDA_CHECK(cudaEventRecord(ev[1]));
+
+    // run range-doppler FFTs
+    fft.run(d_cube.p, d_rd.p, d_tmp.p);
+
+    CUDA_CHECK(cudaEventRecord(ev[2]));
+
+    // power map
+    const int total = M * N;
+    power_map_kernel<<<(total + 255) / 256, 256>>>(d_rd.p, d_power.p, C, M, N);
+    CUDA_CHECK(cudaGetLastError());
+
+    CUDA_CHECK(cudaEventRecord(ev[3]));
+
+    // cfar kernel creation
+    // bboxes for train and guard
+    ca_cfar_kernel<<<(total + 255) / 256, 256>>>(d_power.p, d_mask.p, M, N, g_d,
+                                                 g_r, t_d, t_r, n_train, alpha);
+    CUDA_CHECK(cudaGetLastError());
+
+    CUDA_CHECK(cudaEventRecord(ev[4]));
+
+    // write data to NumPy buffers
+    auto power = py::array_t<float>({M, N});
+    CUDA_CHECK(cudaMemcpy(power.mutable_data(), d_power.p,
+                          total * sizeof(float), cudaMemcpyDeviceToHost));
+    auto mask = py::array_t<bool>({M, N});
+    CUDA_CHECK(cudaMemcpy(mask.mutable_data(), d_mask.p,
+                          total * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+
+    CUDA_CHECK(cudaEventRecord(ev[5]));
+    CUDA_CHECK(cudaEventSynchronize(ev[5]));
+
+    CUDA_CHECK(cudaEventElapsedTime(&ms_h2d, ev[0], ev[1]));
+    CUDA_CHECK(cudaEventElapsedTime(&ms_fft, ev[1], ev[2]));
+    CUDA_CHECK(cudaEventElapsedTime(&ms_power, ev[2], ev[3]));
+    CUDA_CHECK(cudaEventElapsedTime(&ms_cfar, ev[3], ev[4]));
+    CUDA_CHECK(cudaEventElapsedTime(&ms_d2h, ev[4], ev[5]));
+
+    py::dict out;
+    out["power"] = power;
+    out["mask"] = mask;
+
+    py::dict t;
+    t["h2d"] = ms_h2d;
+    t["fft"] = ms_fft;
+    t["power"] = ms_power;
+    t["cfar"] = ms_cfar;
+    t["d2h"] = ms_d2h;
+    out["t_ms"] = t;
+    return out;
+  }
+};
+
 py::array_t<std::complex<float>> range_doppler(
     py::array_t<std::complex<float>, py::array::c_style | py::array::forcecast>
         cube) {
@@ -331,4 +432,11 @@ PYBIND11_MODULE(radar_cuda, m) {
   m.def("ca_cfar_2d", &ca_cfar_2d, py::arg("power"),
         py::arg("guard") = std::make_pair(2, 2),
         py::arg("train") = std::make_pair(4, 8), py::arg("pfa") = 1e-4f);
+  py::class_<RadarPipeline>(m, "RadarPipeline")
+      .def(py::init<int, int, int, std::pair<int, int>, std::pair<int, int>,
+                    float>(),
+           py::arg("C"), py::arg("M"), py::arg("N"),
+           py::arg("guard") = std::make_pair(2, 2),
+           py::arg("train") = std::make_pair(4, 8), py::arg("pfa") = 1e-4)
+      .def("process", &RadarPipeline::process, py::arg("cube"));
 }
