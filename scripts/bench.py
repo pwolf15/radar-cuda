@@ -1,7 +1,7 @@
-"""Per-call wall-clock timings from Python, NumPY vs CUDA.
+"""Per-call wall-clock timings from Python, NumPy vs CUDA.
 
 Includes host-to-device/device-to-host transfers and per-call allocation.
-See README for kernel-only timings."
+See README for kernel-only timings.
 """
 
 import time
