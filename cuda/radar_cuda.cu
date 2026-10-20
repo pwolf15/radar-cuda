@@ -205,6 +205,7 @@ struct RangeDopplerPlan {
     cudaFree(d_w_fast);
     cudaFree(d_w_slow);
   }
+  RangeDopplerPlan(const RangeDopplerPlan &) = delete;
   void run(const cuFloatComplex *d_in, cuFloatComplex *d_out,
            cuFloatComplex *d_tmp) const {
 
@@ -252,27 +253,27 @@ struct RadarPipeline {
 
   RadarPipeline(int C, int M, int N, std::pair<int, int> guard,
                 std::pair<int, int> train, float pfa)
-      : C(C), M(M), N(N), fft(C, M, N), d_cube(C * M * N), d_rd(C * M * N),
-        d_tmp(C * M * N), d_power(N * M), d_mask(M * N), g_d(guard.first),
-        g_r(guard.second), t_d(train.first), t_r(train.second) {
+      : C(C), M(M), N(N), g_d(guard.first), g_r(guard.second), t_d(train.first),
+        t_r(train.second), fft(C, M, N), d_cube(C * M * N), d_rd(C * M * N),
+        d_tmp(C * M * N), d_power(N * M), d_mask(M * N) {
     // n_train, alpha
-    auto [g_d, g_r] = guard;
-    auto [t_d, t_r] = train;
     int n_inner = (2 * g_d + 1) * (2 * g_r + 1);
     int n_outer = (2 * (g_d + t_d) + 1) * (2 * (g_r + t_r) + 1);
     n_train = n_outer - n_inner;
     alpha = compute_alpha(n_train, pfa);
 
-    for (size_t i = 0; i < 6; ++i) {
-      cudaEventCreate(&ev[i]);
+    for (int i = 0; i < 6; ++i) {
+      CUDA_CHECK(cudaEventCreate(&ev[i]));
     }
   }
 
   ~RadarPipeline() {
-    for (size_t i = 0; i < 6; ++i) {
+    for (int i = 0; i < 6; ++i) {
       cudaEventDestroy(ev[i]);
     }
   }
+
+  RadarPipeline(const RadarPipeline &) = delete;
 
   py::dict process(py::array_t<std::complex<float>,
                                py::array::c_style | py::array::forcecast>
