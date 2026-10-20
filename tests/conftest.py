@@ -2,13 +2,13 @@ import pathlib
 import sys
 
 import numpy as np
-
-sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "build"))
-
 import pytest
 
 from radar.params import RadarParams
 from radar.sim import adc_cube
+
+# built CUDA module, if present
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "build"))
 
 
 @pytest.fixture

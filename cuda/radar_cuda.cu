@@ -1,9 +1,11 @@
 #include <cmath>
+#include <cstdint>
 #include <cuda_runtime.h>
 #include <cufft.h>
 #include <numbers>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -84,6 +86,46 @@ __global__ void power_map_kernel(const cuFloatComplex *rd, float *power, int C,
   }
   power[i] = acc;
 }
+
+__device__ inline int wrap(int i, int n) { return (i % n + n) % n; }
+__device__ inline int clampi(int i, int n) {
+  return i < 0 ? 0 : (i >= n ? n - 1 : i);
+}
+
+// one thread per cell
+// wrap on Doppler, clamp on range
+// For each cell under test (CUT), noise level is mean of training
+//   cells: a (2(g_d+t_d)+1) x (2(g_r+t_r)+1) box minus the (2g_d+1) x (2g_r+1)
+//   guard box centered on the CUT. guard/train are (doppler,range) half-widths
+// alpha: exact threshold for exponentially distributed (square-law,
+// single-channel) noise
+__global__ void ca_cfar_kernel(const float *power, uint8_t *mask, int M, int N,
+                               int g_d, int g_r, int t_d, int t_r, int n_train,
+                               float alpha) {
+  size_t i = blockIdx.x * (size_t)blockDim.x + threadIdx.x;
+  if (i >= (size_t)M * N)
+    return;
+  int m = i / N;
+  int n = i % N;
+  float sum_outer = 0.0f, sum_inner = 0.0f;
+  for (int dm = -(g_d + t_d); dm <= g_d + t_d; ++dm) {
+    for (int dn = -(g_r + t_r); dn <= g_r + t_r; ++dn) {
+      float v = power[wrap(m + dm, M) * N + clampi(n + dn, N)];
+      sum_outer += v;
+      if (abs(dm) <= g_d && abs(dn) <= g_r) {
+        sum_inner += v;
+      }
+    }
+  }
+  float sum_train = sum_outer - sum_inner;
+  float noise = sum_train / n_train;
+  mask[i] = power[i] > alpha * noise ? 1 : 0;
+}
+
+static float compute_alpha(int n_train, float pfa) {
+  return n_train * (pow(pfa, -1.0f / n_train) - 1);
+}
+
 struct RangeDopplerPlan {
   int C, M, N;
   cufftHandle plan_range, plan_doppler;
@@ -245,8 +287,48 @@ py::array_t<float> power_map(
   return out;
 }
 
+py::array_t<bool>
+ca_cfar_2d(py::array_t<float, py::array::c_style | py::array::forcecast> power,
+           std::pair<int, int> guard = {2, 2},
+           std::pair<int, int> train = {4, 8}, float pfa = 1e-4) {
+
+  static_assert(sizeof(bool) == 1);
+
+  // read data from NumPy buffer
+  auto buf = power.request();
+  int M = buf.shape[0], N = buf.shape[1];
+  DevBuf<float> d_in(M * N);
+  DevBuf<uint8_t> d_out(M * N);
+  CUDA_CHECK(cudaMemcpy(d_in.p, buf.ptr, sizeof(float) * M * N,
+                        cudaMemcpyHostToDevice));
+
+  // run ca_cfar kernel
+  int total = M * N;
+
+  // bboxes for train and guard
+  auto [g_d, g_r] = guard;
+  auto [t_d, t_r] = train;
+  int n_inner = (2 * g_d + 1) * (2 * g_r + 1);
+  int n_outer = (2 * (g_d + t_d) + 1) * (2 * (g_r + t_r) + 1);
+  int n_train = n_outer - n_inner;
+
+  float alpha = compute_alpha(n_train, pfa);
+  ca_cfar_kernel<<<(total + 255) / 256, 256>>>(d_in.p, d_out.p, M, N, g_d, g_r,
+                                               t_d, t_r, n_train, alpha);
+  CUDA_CHECK(cudaGetLastError());
+
+  // write data to NumPy buffers
+  auto out = py::array_t<bool>({M, N});
+  CUDA_CHECK(cudaMemcpy(out.mutable_data(), d_out.p, M * N * sizeof(uint8_t),
+                        cudaMemcpyDeviceToHost));
+  return out;
+}
+
 PYBIND11_MODULE(radar_cuda, m) {
   m.def("device_name", &device_name);
   m.def("range_doppler", &range_doppler);
   m.def("power_map", &power_map);
+  m.def("ca_cfar_2d", &ca_cfar_2d, py::arg("power"),
+        py::arg("guard") = std::make_pair(2, 2),
+        py::arg("train") = std::make_pair(4, 8), py::arg("pfa") = 1e-4f);
 }
