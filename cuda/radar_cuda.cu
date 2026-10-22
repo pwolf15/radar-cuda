@@ -43,12 +43,13 @@ template <class T> struct DevBuf {
 };
 
 __global__ void apply_windows(const float *w_s, const float *w_f,
-                              cuFloatComplex *x, int M, int N, size_t total) {
+                              const cuFloatComplex *x, cuFloatComplex *y, int M,
+                              int N, size_t total) {
   size_t i = blockIdx.x * (size_t)blockDim.x + threadIdx.x;
   if (i < total) {
     float s_s = w_s[(i / N) % M], s_f = w_f[i % N];
-    x[i].x *= (s_s * s_f);
-    x[i].y *= (s_s * s_f);
+    y[i].x = x[i].x * (s_s * s_f);
+    y[i].y = x[i].y * (s_s * s_f);
   }
 }
 
@@ -191,15 +192,14 @@ struct RangeDopplerPlan {
     cudaFree(d_w_slow_shift);
   }
   RangeDopplerPlan(const RangeDopplerPlan &) = delete;
+  // can run in-place with d_in == d_out
   void run(const cuFloatComplex *d_in, cuFloatComplex *d_out) const {
 
     size_t total = static_cast<size_t>(C) * M * N;
-    CUDA_CHECK(cudaMemcpy(d_out, d_in, sizeof(cuFloatComplex) * total,
-                          cudaMemcpyDeviceToDevice));
 
     // apply windows
-    apply_windows<<<(total + 255) / 256, 256>>>(d_w_slow_shift, d_w_fast, d_out,
-                                                M, N, total);
+    apply_windows<<<(total + 255) / 256, 256>>>(d_w_slow_shift, d_w_fast, d_in,
+                                                d_out, M, N, total);
     CUDA_CHECK(cudaGetLastError());
 
     // run range FFT
@@ -219,7 +219,7 @@ struct RadarPipeline {
   int n_train;
   float alpha;
   RangeDopplerPlan fft;
-  DevBuf<cuFloatComplex> d_cube, d_rd;
+  DevBuf<cuFloatComplex> d_cube;
   DevBuf<float> d_power;
   DevBuf<uint8_t> d_mask;
   cudaEvent_t ev[6]; // timing
@@ -227,8 +227,8 @@ struct RadarPipeline {
   RadarPipeline(int C, int M, int N, std::pair<int, int> guard,
                 std::pair<int, int> train, float pfa)
       : C(C), M(M), N(N), g_d(guard.first), g_r(guard.second), t_d(train.first),
-        t_r(train.second), fft(C, M, N), d_cube(C * M * N), d_rd(C * M * N),
-        d_power(N * M), d_mask(M * N) {
+        t_r(train.second), fft(C, M, N), d_cube(C * M * N), d_power(N * M),
+        d_mask(M * N) {
 
     // n_train, alpha
     int n_inner = (2 * g_d + 1) * (2 * g_r + 1);
@@ -264,13 +264,14 @@ struct RadarPipeline {
     CUDA_CHECK(cudaEventRecord(ev[1]));
 
     // run range-doppler FFTs
-    fft.run(d_cube.p, d_rd.p);
+    fft.run(d_cube.p, d_cube.p);
 
     CUDA_CHECK(cudaEventRecord(ev[2]));
 
     // power map
     const int total = M * N;
-    power_map_kernel<<<(total + 255) / 256, 256>>>(d_rd.p, d_power.p, C, M, N);
+    power_map_kernel<<<(total + 255) / 256, 256>>>(d_cube.p, d_power.p, C, M,
+                                                   N);
     CUDA_CHECK(cudaGetLastError());
 
     CUDA_CHECK(cudaEventRecord(ev[3]));
