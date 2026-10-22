@@ -229,7 +229,7 @@ struct RadarPipeline {
                 std::pair<int, int> train, float pfa)
       : C(C), M(M), N(N), g_d(guard.first), g_r(guard.second), t_d(train.first),
         t_r(train.second), fft(C, M, N), d_cube(C * M * N), d_power(N * M),
-        d_mask(M * N) {
+        d_mask(M * N), h_input(nullptr) {
 
     // n_train, alpha
     int n_inner = (2 * g_d + 1) * (2 * g_r + 1);
@@ -242,13 +242,14 @@ struct RadarPipeline {
     }
 
     // pinned memory for fast implementation
-    cudaMallocHost(&h_input, sizeof(cuFloatComplex) * C * M * N);
+    CUDA_CHECK(cudaMallocHost(&h_input, sizeof(cuFloatComplex) * C * M * N));
   }
 
   ~RadarPipeline() {
     for (int i = 0; i < 6; ++i) {
       cudaEventDestroy(ev[i]);
     }
+    cudaFreeHost(h_input);
   }
 
   RadarPipeline(const RadarPipeline &) = delete;
