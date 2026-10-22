@@ -1,5 +1,6 @@
-"""Per-call wall-clock timings from Python, NumPy vs CUDA.
+"""Wall-clock per call for NumPy vs CUDA.
 
+Includes per-stage GPU times (cudaEvent) for the pipeline as median and p99.
 Includes host-to-device/device-to-host transfers and per-call allocation.
 See README for kernel-only timings.
 """
@@ -40,6 +41,7 @@ def cu_chain(c):
     return radar_cuda.ca_cfar_2d(radar_cuda.power_map(radar_cuda.range_doppler(c)))
 
 
+np_full = bench(np_chain, cube)
 rows = [
     (
         "range+doppler FFT",
@@ -48,11 +50,25 @@ rows = [
     ),
     ("power_map", bench(power_map, rd_np), bench(radar_cuda.power_map, rd_cu)),
     ("ca_cfar_2d", bench(ca_cfar_2d, pw_np), bench(radar_cuda.ca_cfar_2d, pw_cu)),
-    ("full chain", bench(np_chain, cube), bench(cu_chain, cube)),
-    ("pipeline (1 H2D, 1 D2H)", bench(np_chain, cube), bench(pipe.process, cube)),
+    ("full chain", np_full, bench(cu_chain, cube)),
+    ("pipeline (1 H2D, 1 D2H)", np_full, bench(pipe.process, cube)),
 ]
 print(f"{'stage':<26}{'NumPy ms':>10}{'CUDA ms':>10}{'speedup':>9}")
 for name, a, b in rows:
     print(f"{name:<26}{a:10.2f}{b:10.2f}{a / b:>9.1f}x")
-t = pipe.process(cube)["t_ms"]
-print("\nkernel breakdown (ms):", {k: round(v, 3) for k, v in t.items()})
+
+N_WARMUP = 3
+N_ITER = 500
+
+for _ in range(N_WARMUP):
+    pipe.process(cube)
+
+samples: dict[str, list[float]] = {}
+for _ in range(N_ITER):
+    for stage, ms in pipe.process(cube)["t_ms"].items():
+        samples.setdefault(stage, []).append(ms)
+
+print(f"\nkernel breakdown, ms over {N_ITER} calls")
+print(f"{'stage':<8}{'median':>9}{'p99':>9}")
+for stage, ms in samples.items():
+    print(f"{stage:<8}{np.median(ms):9.3f}{np.percentile(ms, 99):9.3f}")
