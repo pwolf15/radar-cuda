@@ -80,3 +80,14 @@ def test_cuda_pipeline_matches_stages(cube):
     assert np.array_equal(r["mask"], radar_cuda.ca_cfar_2d(power))
     r2 = pipe.process(cube)
     assert np.array_equal(r2["mask"], r["mask"])
+
+
+def test_cuda_pipeline_in_place_matches_stages(cube):
+    pipe = radar_cuda.RadarPipeline(*cube.shape)
+    pipe.input[...] = cube
+    r = pipe.process()
+    power = radar_cuda.power_map(radar_cuda.range_doppler(cube))
+    assert np.allclose(r["power"], power, rtol=1e-5)
+    assert np.array_equal(r["mask"], radar_cuda.ca_cfar_2d(power))
+    r2 = pipe.process(cube)
+    assert np.array_equal(r2["mask"], r["mask"])

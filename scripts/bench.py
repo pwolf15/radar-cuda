@@ -41,6 +41,8 @@ def cu_chain(c):
     return radar_cuda.ca_cfar_2d(radar_cuda.power_map(radar_cuda.range_doppler(c)))
 
 
+pipe.input[...] = cube  # producer writes into pinned memory, outside timing
+
 np_full = bench(np_chain, cube)
 rows = [
     (
@@ -51,7 +53,8 @@ rows = [
     ("power_map", bench(power_map, rd_np), bench(radar_cuda.power_map, rd_cu)),
     ("ca_cfar_2d", bench(ca_cfar_2d, pw_np), bench(radar_cuda.ca_cfar_2d, pw_cu)),
     ("full chain", np_full, bench(cu_chain, cube)),
-    ("pipeline (1 H2D, 1 D2H)", np_full, bench(pipe.process, cube)),
+    ("pipeline, pageable input", np_full, bench(pipe.process, cube)),
+    ("pipeline, pinned input", np_full, bench(pipe.process)),
 ]
 print(f"{'stage':<26}{'NumPy ms':>10}{'CUDA ms':>10}{'speedup':>9}")
 for name, a, b in rows:
@@ -60,15 +63,21 @@ for name, a, b in rows:
 N_WARMUP = 3
 N_ITER = 500
 
-for _ in range(N_WARMUP):
-    pipe.process(cube)
 
-samples: dict[str, list[float]] = {}
-for _ in range(N_ITER):
-    for stage, ms in pipe.process(cube)["t_ms"].items():
-        samples.setdefault(stage, []).append(ms)
+def stage_times(call, n_warmup=N_WARMUP, n_iter=N_ITER):
+    for _ in range(n_warmup):
+        call()
+    samples: dict[str, list[float]] = {}
+    for _ in range(n_iter):
+        for stage, ms in call()["t_ms"].items():
+            samples.setdefault(stage, []).append(ms)
+    return samples
 
-print(f"\nkernel breakdown, ms over {N_ITER} calls")
-print(f"{'stage':<8}{'median':>9}{'p99':>9}")
-for stage, ms in samples.items():
-    print(f"{stage:<8}{np.median(ms):9.3f}{np.percentile(ms, 99):9.3f}")
+
+pageable = stage_times(lambda: pipe.process(cube))
+pinned = stage_times(lambda: pipe.process())
+
+print(f"\nkernel breakdown, ms median over {N_ITER} calls")
+print(f"{'stage':<8}{'pageable':>10}{'pinned':>10}")
+for stage in pageable:
+    print(f"{stage:<8}{np.median(pageable[stage]):10.3f}{np.median(pinned[stage]):10.3f}")

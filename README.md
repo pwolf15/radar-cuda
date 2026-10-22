@@ -36,17 +36,34 @@ cmake --build ./build
 uv run pytest tests/test_cuda.py
 ```
 
-## Timings (RTX 3060, 8x128x400 frame, float32 CUDA vs float64 NumPy)
+## Timings
 
-| stage              | NumPy ms | CUDA ms (wall, per call) | CUDA ms (kernel only) |
-|--------------------|---------:|-------------------------:|----------------------:|
-| range + Doppler FFT|    13.3  |   2.15                   | 0.18                  |
-| power map          |     2.1  |   0.69                   | 0.012                 |
-| CA-CFAR (naive)    |     1.9  |   0.14                   | 0.065                 |
-| full chain         |    18.3  |   0.80 (pipeline)        | 0.26                  |
+RTX 3060 on an HP Z230 (PCIe Gen3 x16), one 8 x 128 x 400 frame, float32 CUDA vs. float 64 NumPy. Wall-clock is per Python call; GPU stage times are `cudaEvent` medains over 500 calls. `script/bench.py` reproduces both.
 
-Wall-clock includes host-to-device (0.48 ms for the 3.3 MB cube) and device-to-host (0.07 ms).
-Per-stage "wall" rows allocate and transfer per call; the pipeline row uploads once, runs three kernels, downloads `power` and `mask`. Kernel times are `cudaEvent` deltas. `scripts/bench.py` reproduces the table.
+| stage                    | NumPy ms | CUDA ms (wall) |
+|--------------------------|---------:|---------------:|
+| range + Doppler FFT      |    13.69 |           1.94 |
+| power map                |     2.11 |           0.70 |
+| CA-CFAR (naive)          |     1.90 |           0.14 |
+| full chain, per-stage calls |  18.71 |           2.98 |
+| pipeline, pageable input |    18.71 |           0.71 |
+| pipeline, pinned input   |    18.71 |           0.60 |
+
+The per-stage rows allocate and transfer on every call; the pipeline uploads once, runs all kernels on device, and downloads only `power` and `mask`.
+
+### Optimization steps
+
+| step                                         | fft ms | h2d ms | pipeline ms |
+|----------------------------------------------|-------:|-------:|------------:|
+| baseline                                     |  0.184 |  0.48  |        0.80 |
+| fold fftshift into the window, merge kernels |  0.112 |  0.47  |        0.73 |
+| run in place, drop the device copy           |  0.091 |  0.47  |        0.72 |
+| pinned input buffer                          |  0.089 |  0.36  |        0.60 |
+
+* **fftshift.**. Multiplying the slow-time window by (1)^m shifts the Doppler spectrum by M/2, which is fftshift for even M. Following this, I merged both windows into one kernel, and running in place removed four passes over the 3.3 MB cube (~22 us each, ~270 Gb/s, which nears card's memory bandwidth).
+* **Pinned input.** `RadarPipeline.input` is a NumPy view onto a `cudaMallocHost` buffer; a producer writes into it and `process()` uploads without staging. Host-to-device reaches 9.2 GB/s on Gen3 x16.
+
+At current frame size, transfer costs four times FFT work: pipeline is bound by PCIe.
 
 ## Status
 
