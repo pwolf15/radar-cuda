@@ -82,7 +82,7 @@ def test_cuda_pipeline_matches_stages(cube):
     assert np.array_equal(r2["mask"], r["mask"])
 
 
-def test_cuda_pipeline_in_place_matches_stages(cube):
+def test_cuda_pipeline_pinned_input_matches_stages(cube):
     pipe = radar_cuda.RadarPipeline(*cube.shape)
     pipe.input[...] = cube
     r = pipe.process()

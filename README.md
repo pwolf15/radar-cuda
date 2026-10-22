@@ -38,7 +38,7 @@ uv run pytest tests/test_cuda.py
 
 ## Timings
 
-RTX 3060 on an HP Z230 (PCIe Gen3 x16), one 8 x 128 x 400 frame, float32 CUDA vs. float 64 NumPy. Wall-clock is per Python call; GPU stage times are `cudaEvent` medains over 500 calls. `script/bench.py` reproduces both.
+RTX 3060 on an HP Z230 (PCIe Gen3 x16), one 8 x 128 x 400 frame, float32 CUDA vs. float64 NumPy. Wall-clock is per Python call; GPU stage times are `cudaEvent` medians over 500 calls. `scripts/bench.py` reproduces both.
 
 | stage                    | NumPy ms | CUDA ms (wall) |
 |--------------------------|---------:|---------------:|
@@ -60,7 +60,7 @@ The per-stage rows allocate and transfer on every call; the pipeline uploads onc
 | run in place, drop the device copy           |  0.091 |  0.47  |        0.72 |
 | pinned input buffer                          |  0.089 |  0.36  |        0.60 |
 
-* **fftshift.**. Multiplying the slow-time window by (1)^m shifts the Doppler spectrum by M/2, which is fftshift for even M. Following this, I merged both windows into one kernel, and running in place removed four passes over the 3.3 MB cube (~22 us each, ~270 Gb/s, which nears card's memory bandwidth).
+* **fftshift.** Multiplying the slow-time window by (-1)^m shifts the Doppler spectrum by M/2, which is fftshift for even M. Following this, I merged both windows into one kernel, and running in place removed four passes over the 3.3 MB cube (~22 us each, ~270 Gb/s, which nears card's memory bandwidth).
 * **Pinned input.** `RadarPipeline.input` is a NumPy view onto a `cudaMallocHost` buffer; a producer writes into it and `process()` uploads without staging. Host-to-device reaches 9.2 GB/s on Gen3 x16.
 
 At current frame size, transfer costs four times FFT work: pipeline is bound by PCIe.
